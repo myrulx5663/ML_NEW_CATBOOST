@@ -8,7 +8,7 @@ import seaborn as sns
 # Load model
 @st.cache_resource
 def load_model():
-    return joblib.load("water_potability_pipeline.pkl")
+    return joblib.load("water_potability_pipline.pkl")
 
 model = load_model()
 
