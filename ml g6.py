@@ -2,26 +2,37 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import os
 
-# Set page title and icon
+# Set page config
 st.set_page_config(page_title="💧 Water Potability Predictor", page_icon="💧")
-
-# Load model and threshold
-@st.cache_resource
-def load_model():
-    data = joblib.load("best_model_svc_calibrated.pkl")
-    return data["pipeline"], data["threshold"]
-
-pipeline, threshold = load_model()
 
 # Title and description
 st.title("💧 Water Potability Prediction")
 st.markdown("""
 Enter the water quality parameters below to determine if the water is safe to drink.
-All values should be numeric. Leave fields blank if unsure — default values will be used.
+All values should be numeric.
 """)
 
-# Input fields with default values
+# Load model function with error handling
+@st.cache_resource
+def load_model():
+    model_path = "best_model_svc_calibrated.pkl"
+    
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file '{model_path}' not found. "
+                                "Please ensure it is uploaded in the correct location.")
+    
+    data = joblib.load(model_path)
+    return data["pipeline"], data["threshold"]
+
+try:
+    pipeline, threshold = load_model()
+except FileNotFoundError as e:
+    st.error(str(e))
+    st.stop()
+
+# Input fields
 ph = st.number_input("pH", min_value=0.0, max_value=14.0, value=7.0, help="Measure of acidity/alkalinity")
 hardness = st.number_input("Hardness (mg/L)", min_value=0.0, value=150.0, help="Water hardness in mg/L")
 solids = st.number_input("Solids (ppm)", min_value=0.0, value=20000.0, help="Total dissolved solids in ppm")
@@ -32,7 +43,7 @@ organic_carbon = st.number_input("Organic Carbon (ppm)", min_value=0.0, value=15
 trihalomethanes = st.number_input("Trihalomethanes (ppm)", min_value=0.0, value=60.0, help="THM content in ppm")
 turbidity = st.number_input("Turbidity (NTU)", min_value=0.0, value=5.0, help="Water turbidity in NTU")
 
-# Create DataFrame from input
+# Create input DataFrame
 input_data = pd.DataFrame([{
     "ph": ph,
     "Hardness": hardness,
@@ -47,19 +58,15 @@ input_data = pd.DataFrame([{
 
 # Predict button
 if st.button("Predict Potability"):
-    # Make prediction
-    prob = pipeline.predict_proba(input_data)[0][1]
-    prediction = "✅ Safe to Drink" if prob >= threshold else "❌ Not Safe"
-    
-    # Display result
-    st.subheader("Prediction Result:")
-    st.markdown(f"### Water is **{prediction}**")
-    st.write(f"Probability Score: **{prob:.2f}**")
-    st.write(f"Decision Threshold: **{threshold:.2f}**")
+    try:
+        prob = pipeline.predict_proba(input_data)[0][1]
+        prediction = "✅ Safe to Drink" if prob >= threshold else "❌ Not Safe"
 
-    # Optional: Show progress bar
-    st.progress(float(prob))
+        st.subheader("Prediction Result:")
+        st.markdown(f"### Water is **{prediction}**")
+        st.write(f"Probability Score: **{prob:.2f}**")
+        st.write(f"Decision Threshold: **{threshold:.2f}**")
+        st.progress(float(prob))
 
-# Footer
-st.markdown("---")
-st.markdown("Built with ❤️ using Streamlit | Model trained using SVM with threshold optimization")
+    except Exception as e:
+        st.error(f"An error occurred during prediction: {str(e)}")
